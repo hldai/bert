@@ -107,6 +107,28 @@ def whitespace_tokenize(text):
   return tokens
 
 
+class SpaceTokenizer:
+  def __init__(self, vocab_file, do_lower_case=True):
+    self.vocab = load_vocab(vocab_file)
+    self.inv_vocab = {v: k for k, v in self.vocab.items()}
+
+  def tokenize(self, text):
+    return whitespace_tokenize(text)
+
+  def convert_tokens_to_ids(self, tokens):
+    output = []
+    for item in tokens:
+      token_id = self.vocab.get(item, -1)
+      if token_id == -1:
+        token_id = self.vocab['[UNK]']
+      output.append(token_id)
+    return output
+    # return convert_by_vocab(self.vocab, tokens)
+
+  def convert_ids_to_tokens(self, ids):
+    return convert_by_vocab(self.inv_vocab, ids)
+
+
 class FullTokenizer(object):
   """Runs end-to-end tokenziation."""
 
