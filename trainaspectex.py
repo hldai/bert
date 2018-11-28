@@ -219,7 +219,7 @@ def file_based_input_fn_builder(input_file, seq_length, is_training,
 
 def __get_num_sents(sents_file):
     n_sents = 0
-    with open(sents_file, encoding='utf-8') as f:
+    with open(sents_file) as f:
         for _ in f:
             n_sents += 1
     return n_sents
