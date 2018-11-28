@@ -421,7 +421,8 @@ def main(input_file, init_checkpoint, batch_size, layers, bert_config_file, voca
 if __name__ == "__main__":
     BERT_BASE_DIR = 'd:/data/res/bert/uncased_L-12_H-768_A-12'
     YELP_MODEL_DIR = 'd:/data/res/bert/yelp'
-    dataset = 'se14-restaurant'
+    # dataset = 'se14-restaurant'
+    dataset = 'se15-restaurant'
 
     if dataset == 'se14-laptop':
         # input_file = 'd:/data/aspect/semeval14/laptops/laptops_train_texts_tok.txt'
@@ -429,11 +430,17 @@ if __name__ == "__main__":
         input_file = 'd:/data/aspect/semeval14/laptops/laptops_test_texts_tok.txt'
         output_file = 'd:/data/aspect/semeval14/laptops/laptops_test_texts_tok_bert.txt'
         init_checkpoint = BERT_BASE_DIR + '/bert_model.ckpt'
-    else:
+    elif dataset == 'se14-restaurant':
         input_file = 'd:/data/aspect/semeval14/restaurants/restaurants_train_texts_tok.txt'
         output_file = 'd:/data/aspect/semeval14/restaurants/restaurants_train_texts_tok_bert.txt'
         # input_file = 'd:/data/aspect/semeval14/restaurants/restaurants_test_texts_tok.txt'
         # output_file = 'd:/data/aspect/semeval14/restaurants/restaurants_test_texts_tok_bert.txt'
+        init_checkpoint = YELP_MODEL_DIR + '/model.ckpt-10000'
+    else:
+        # input_file = 'd:/data/aspect/semeval15/restaurants/restaurants_train_texts_tok.txt'
+        # output_file = 'd:/data/aspect/semeval15/restaurants/restaurants_train_texts_tok_bert.txt'
+        input_file = 'd:/data/aspect/semeval15/restaurants/restaurants_test_texts_tok.txt'
+        output_file = 'd:/data/aspect/semeval15/restaurants/restaurants_test_texts_tok_bert.txt'
         init_checkpoint = YELP_MODEL_DIR + '/model.ckpt-10000'
 
     vocab_file = BERT_BASE_DIR + '/vocab.txt'
