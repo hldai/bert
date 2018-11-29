@@ -98,7 +98,7 @@ def create_model(bert_config, is_training, input_ids, input_mask, segment_ids, l
         log_probs = tf.nn.log_softmax(logits, axis=-1)
         one_hot_labels = tf.one_hot(label_ids, depth=num_labels, dtype=tf.float32)
         per_example_loss = -tf.reduce_sum(one_hot_labels * log_probs, axis=-1)
-        per_example_loss = input_mask * per_example_loss
+        per_example_loss = tf.dtypes.cast(input_mask, tf.float32) * per_example_loss
         loss = tf.reduce_sum(per_example_loss)
         probabilities = tf.nn.softmax(logits, axis=-1)
         predict = tf.argmax(probabilities, axis=-1)
@@ -284,8 +284,10 @@ def __train_aspectex_bert(train_file, eval_file, init_checkpoint, learning_rate,
         seq_length=max_seq_len,
         is_training=False,
         drop_remainder=False)
-    result = estimator.evaluate(input_fn=eval_input_fn, steps=None)
-    tf.logging.info('loss={}, acc={}'.format(result['eval_loss'], result['eval_accuracy']))
+    # result = estimator.evaluate(input_fn=eval_input_fn, steps=None)
+    # tf.logging.info('loss={}, acc={}'.format(result['eval_loss'], result['eval_accuracy']))
+    preds = estimator.predict(eval_input_fn)
+    tf.logging.info(preds)
 
 
 if __name__ == '__main__':
