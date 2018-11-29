@@ -156,6 +156,7 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
                 return {
                     "eval_accuracy": accuracy,
                     "eval_loss": loss,
+                    "per_example_loss": per_example_loss
                 }
 
             eval_metrics = (metric_fn, [per_example_loss, label_ids, logits])
@@ -248,6 +249,7 @@ def __train_aspectex_bert(train_file, eval_file, init_checkpoint, learning_rate,
     num_train_steps = int(
         n_train_examples / train_batch_size * num_train_epochs)
     num_warmup_steps = int(num_train_steps * warmup_proportion)
+    tf.logging.info('{} train steps'.format(num_train_steps))
 
     model_fn = model_fn_builder(
         bert_config=bert_config,
