@@ -243,7 +243,6 @@ def __train_aspectex_bert(train_file, eval_file, init_checkpoint, learning_rate,
         save_checkpoints_steps=save_checkpoints_steps,
         tpu_config=tf.contrib.tpu.TPUConfig(
             iterations_per_loop=iterations_per_loop,
-            num_shards=num_tpu_cores,
             per_host_input_for_training=is_per_host))
 
     n_train_examples = __get_num_sents(train_sents_file)
@@ -284,10 +283,10 @@ def __train_aspectex_bert(train_file, eval_file, init_checkpoint, learning_rate,
         seq_length=max_seq_len,
         is_training=False,
         drop_remainder=False)
-    # result = estimator.evaluate(input_fn=eval_input_fn, steps=None)
-    # tf.logging.info('loss={}, acc={}'.format(result['eval_loss'], result['eval_accuracy']))
-    preds = estimator.predict(eval_input_fn)
-    tf.logging.info(preds)
+    result = estimator.evaluate(input_fn=eval_input_fn, steps=None)
+    tf.logging.info('loss={}, acc={}'.format(result['eval_loss'], result['eval_accuracy']))
+    # preds = estimator.predict(eval_input_fn)
+    # tf.logging.info(preds)
 
 
 if __name__ == '__main__':
@@ -306,9 +305,9 @@ if __name__ == '__main__':
     eval_batch_size, predict_batch_size = 8, 8
     warmup_proportion = 0.1
     num_tpu_cores = 1
-    save_checkpoints_steps = 1000
+    save_checkpoints_steps = 200
     train_batch_size = 32
-    num_train_epochs = 3.0
+    num_train_epochs = 10.0
     max_seq_len = 128
     n_labels = 5
     learning_rate = 5e-5
