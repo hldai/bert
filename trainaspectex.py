@@ -227,7 +227,120 @@ def __get_num_sents(sents_file):
     return n_sents
 
 
-def __train_aspectex_bert(train_file, eval_file, init_checkpoint, learning_rate, train_sents_file):
+def __get_num_train_valid_samples(train_valid_split_file):
+    with open(train_valid_split_file) as f:
+        vals = f.read().strip().split(' ')
+    n_train_samples = 0
+    for v in vals:
+        if v == '0':
+            n_train_samples += 1
+    return n_train_samples, len(vals) - n_train_samples
+
+
+def __get_sent_tokens(tok_texts_file, vocab_file):
+    print(vocab_file)
+    tokenizer = tokenization.SpaceTokenizer(vocab_file)
+    f = open(tok_texts_file, encoding='utf-8')
+    token_seqs = list()
+    for line in f:
+        raw_tokens = tokenizer.tokenize(line)
+        tokens = ["[CLS]"]
+        for token in raw_tokens:
+            tokens.append(token)
+        tokens.append("[SEP]")
+        token_seqs.append(tokens)
+    return token_seqs
+
+
+def get_terms_from_label_list(labels, words, label_beg, label_in):
+    terms = list()
+    # words = tok_text.split(' ')
+    # print(labels_pred)
+    # print(len(words), len(labels_pred))
+    assert len(words) == len(labels)
+
+    p = 0
+    while p < len(words):
+        yi = labels[p]
+        if yi == label_beg:
+            pright = p
+            while pright + 1 < len(words) and labels[pright + 1] == label_in:
+                pright += 1
+            terms.append(' '.join(words[p: pright + 1]))
+            p = pright + 1
+        else:
+            p += 1
+    return terms
+
+
+def __get_true_terms(sents_file):
+    sents = list()
+    with open(sents_file, encoding='utf-8') as f:
+        for line in f:
+            sents.append(json.loads(line))
+
+    aspect_terms_true_list = list()
+    opinion_terms_true_list = list()
+    for sent in sents:
+        if aspect_terms_true_list is not None:
+            aspect_terms_true_list.append(
+                [t['term'].lower() for t in sent['terms']] if 'terms' in sent else list())
+        if opinion_terms_true_list is not None:
+            opinion_terms_true_list.append([w.lower() for w in sent.get('opinions', list())])
+    return aspect_terms_true_list, opinion_terms_true_list
+
+
+def count_hit(terms_true, terms_pred):
+    terms_true, terms_pred = terms_true.copy(), terms_pred.copy()
+    terms_true.sort()
+    terms_pred.sort()
+    idx_pred = 0
+    cnt_hit = 0
+    for t in terms_true:
+        while idx_pred < len(terms_pred) and terms_pred[idx_pred] < t:
+            idx_pred += 1
+        if idx_pred == len(terms_pred):
+            continue
+        if terms_pred[idx_pred] == t:
+            cnt_hit += 1
+            idx_pred += 1
+    return cnt_hit
+
+
+def __prf1_for_terms(preds, token_seqs, aspect_terms_true_list, opinion_terms_true_list):
+    aspect_true_cnt, aspect_sys_cnt, aspect_hit_cnt = 0, 0, 0
+    opinion_true_cnt, opinion_sys_cnt, opinion_hit_cnt = 0, 0, 0
+    for i, (p_seq, token_seq) in enumerate(zip(preds, token_seqs)):
+        seq_len = len(token_seq)
+        aspect_terms_sys = get_terms_from_label_list(p_seq[1:seq_len - 1], token_seq[1:seq_len - 1], 1, 2)
+        opinion_terms_sys = get_terms_from_label_list(p_seq[1:seq_len - 1], token_seq[1:seq_len - 1], 3, 4)
+        aspect_terms_true, opinion_terms_true = aspect_terms_true_list[i], opinion_terms_true_list[i]
+        aspect_sys_cnt += len(aspect_terms_sys)
+        aspect_true_cnt += len(aspect_terms_true)
+        opinion_sys_cnt += len(opinion_terms_sys)
+        opinion_true_cnt += len(opinion_terms_true)
+
+        new_hit_cnt = count_hit(aspect_terms_true, aspect_terms_sys)
+        aspect_hit_cnt += new_hit_cnt
+        new_hit_cnt = count_hit(opinion_terms_true, opinion_terms_sys)
+        opinion_hit_cnt += new_hit_cnt
+
+    def prf1(n_true, n_sys, n_hit):
+        p = n_hit / (n_sys + 1e-6)
+        r = n_hit / (n_true + 1e-6)
+        f1 = 2 * p * r / (p + r + 1e-6)
+        return p, r, f1
+
+    aspect_p, aspect_r, aspect_f1 = prf1(aspect_true_cnt, aspect_sys_cnt, aspect_hit_cnt)
+    opinion_p, opinion_r, opinion_f1 = prf1(opinion_true_cnt, opinion_sys_cnt, opinion_hit_cnt)
+    # print(aspect_p, aspect_r, aspect_f1, opinion_p, opinion_r, opinion_f1)
+    tf.logging.info('p={:.4f}, r={:.4f}, a_f1={:.4f}; p={:.4f}, r={:.4f}, o_f1={:.4f}'.format(
+                    aspect_p, aspect_r, aspect_f1, opinion_p, opinion_r,
+                    opinion_f1))
+
+
+def __run_aspectex_bert(train_file, eval_file, init_checkpoint, learning_rate, train_valid_split_file,
+                        test_sents_file=None, test_tok_texts_file=None, vocab_file=None):
     tf.logging.set_verbosity(tf.logging.INFO)
     tf.logging.info(train_file)
     tf.logging.info(eval_file)
@@ -245,7 +358,8 @@ def __train_aspectex_bert(train_file, eval_file, init_checkpoint, learning_rate,
             iterations_per_loop=iterations_per_loop,
             per_host_input_for_training=is_per_host))
 
-    n_train_examples = __get_num_sents(train_sents_file)
+    # n_train_examples = __get_num_sents(train_sents_file)
+    n_train_examples, n_valid_examples = __get_num_train_valid_samples(train_valid_split_file)
     num_train_steps = int(
         n_train_examples / train_batch_size * num_train_epochs)
     num_warmup_steps = int(num_train_steps * warmup_proportion)
@@ -267,26 +381,31 @@ def __train_aspectex_bert(train_file, eval_file, init_checkpoint, learning_rate,
         eval_batch_size=eval_batch_size,
         predict_batch_size=predict_batch_size)
 
-    tf.logging.info("***** Running training *****")
-    tf.logging.info("  Num examples = %d", n_train_examples)
-    tf.logging.info("  Batch size = %d", train_batch_size)
-    tf.logging.info("  Num steps = %d", num_train_steps)
-    train_input_fn = file_based_input_fn_builder(
-        input_file=train_file,
-        seq_length=max_seq_len,
-        is_training=True,
-        drop_remainder=True)
-    estimator.train(input_fn=train_input_fn, max_steps=num_train_steps)
+    if test_sents_file is None:
+        tf.logging.info("***** Running training *****")
+        tf.logging.info("  Num examples = %d", n_train_examples)
+        tf.logging.info("  Batch size = %d", train_batch_size)
+        tf.logging.info("  Num steps = %d", num_train_steps)
+        train_input_fn = file_based_input_fn_builder(
+            input_file=train_file,
+            seq_length=max_seq_len,
+            is_training=True,
+            drop_remainder=True)
+        estimator.train(input_fn=train_input_fn, max_steps=num_train_steps)
 
-    eval_input_fn = file_based_input_fn_builder(
-        input_file=eval_file,
-        seq_length=max_seq_len,
-        is_training=False,
-        drop_remainder=False)
-    result = estimator.evaluate(input_fn=eval_input_fn, steps=None)
-    tf.logging.info('loss={}, acc={}'.format(result['eval_loss'], result['eval_accuracy']))
-    # preds = estimator.predict(eval_input_fn)
-    # tf.logging.info(preds)
+    if test_sents_file is not None:
+        eval_input_fn = file_based_input_fn_builder(
+            input_file=eval_file,
+            seq_length=max_seq_len,
+            is_training=False,
+            drop_remainder=False)
+        # result = estimator.evaluate(input_fn=eval_input_fn, steps=None)
+        # tf.logging.info('loss={}, acc={}'.format(result['eval_loss'], result['eval_accuracy']))
+        preds = estimator.predict(eval_input_fn)
+
+        token_seqs = __get_sent_tokens(test_tok_texts_file, vocab_file)
+        aspect_terms_true_list, opinion_terms_true_list = __get_true_terms(test_sents_file)
+        __prf1_for_terms(preds, token_seqs, aspect_terms_true_list, opinion_terms_true_list)
 
 
 if __name__ == '__main__':
@@ -323,6 +442,7 @@ if __name__ == '__main__':
     se14_restaurant_test_sents_file = os.path.join(se14_dir, 'restaurants/restaurants_test_sents.json')
     se14_reataurant_test_tok_texts_file = os.path.join(se14_dir, 'restaurants/restaurants_test_texts_tok.txt')
     se14_restaurant_test_tfrecord_file = os.path.join(se14_dir, 'bert-data/se14-restaurants-test.tfrecord')
+    se14r_init_checkpoint_for_test = os.path.join(se14_dir, 'bert-output/model.ckpt-600')
 
     # __gen_train_valid_tf_records(
     #     se14_restaurant_train_sents_file, se14_restaurant_train_tok_texts_file,
@@ -330,6 +450,9 @@ if __name__ == '__main__':
     #     se14_restaurant_valid_tfrecord_file)
     # __gen_test_tf_records(se14_restaurant_test_sents_file, se14_reataurant_test_tok_texts_file,
     #                       se14_restaurant_test_tfrecord_file)
-    __train_aspectex_bert(se14_restaurant_train_tfrecord_file, se14_restaurant_test_tfrecord_file,
-                          restaurant_init_checkpoint, learning_rate,
-                          se14_restaurant_train_sents_file)
+    # __run_aspectex_bert(se14_restaurant_train_tfrecord_file, se14_restaurant_test_tfrecord_file,
+    #                     restaurant_init_checkpoint, learning_rate,
+    #                     se14_restaurant_train_sents_file)
+    __run_aspectex_bert(se14_restaurant_train_tfrecord_file, se14_restaurant_test_tfrecord_file,
+                        se14r_init_checkpoint_for_test, learning_rate, se14_restaurant_train_valid_split_file,
+                        se14_restaurant_test_sents_file, se14_reataurant_test_tok_texts_file, vocab_file)
