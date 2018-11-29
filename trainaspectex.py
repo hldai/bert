@@ -98,6 +98,7 @@ def create_model(bert_config, is_training, input_ids, input_mask, segment_ids, l
         log_probs = tf.nn.log_softmax(logits, axis=-1)
         one_hot_labels = tf.one_hot(label_ids, depth=num_labels, dtype=tf.float32)
         per_example_loss = -tf.reduce_sum(one_hot_labels * log_probs, axis=-1)
+        per_example_loss = input_mask * per_example_loss
         loss = tf.reduce_sum(per_example_loss)
         probabilities = tf.nn.softmax(logits, axis=-1)
         predict = tf.argmax(probabilities, axis=-1)
@@ -131,12 +132,12 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
             tf.train.init_from_checkpoint(init_checkpoint, assignment_map)
 
         # logging out trainable variables
-        tf.logging.info("**** Trainable Variables ****")
-        for var in tvars:
-            init_string = ""
-            if var.name in initialized_variable_names:
-                init_string = ", *INIT_FROM_CKPT*"
-            tf.logging.info("  name = %s, shape = %s%s", var.name, var.shape, init_string)
+        # tf.logging.info("**** Trainable Variables ****")
+        # for var in tvars:
+        #     init_string = ""
+        #     if var.name in initialized_variable_names:
+        #         init_string = ", *INIT_FROM_CKPT*"
+        #     tf.logging.info("  name = %s, shape = %s%s", var.name, var.shape, init_string)
 
         if mode == tf.estimator.ModeKeys.TRAIN:
             train_op = optimization.create_optimizer(
@@ -156,7 +157,7 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
                 return {
                     "eval_accuracy": accuracy,
                     "eval_loss": loss,
-                    "per_example_loss": per_example_loss
+                    # "per_example_loss": per_example_loss
                 }
 
             eval_metrics = (metric_fn, [per_example_loss, label_ids, logits])
