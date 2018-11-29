@@ -225,9 +225,10 @@ def __get_num_sents(sents_file):
     return n_sents
 
 
-def __train_aspectex_bert(data_dir, init_checkpoint, learning_rate, train_sents_file):
+def __train_aspectex_bert(train_file, eval_file, init_checkpoint, learning_rate, train_sents_file):
     tf.logging.set_verbosity(tf.logging.INFO)
-    tf.logging.info(data_dir)
+    tf.logging.info(train_file)
+    tf.logging.info(eval_file)
 
     bert_config = modeling.BertConfig.from_json_file(bert_config_file)
     tpu_cluster_resolver = None
@@ -264,7 +265,6 @@ def __train_aspectex_bert(data_dir, init_checkpoint, learning_rate, train_sents_
         eval_batch_size=eval_batch_size,
         predict_batch_size=predict_batch_size)
 
-    train_file = os.path.join(output_dir, "train.tf_record")
     tf.logging.info("***** Running training *****")
     tf.logging.info("  Num examples = %d", n_train_examples)
     tf.logging.info("  Batch size = %d", train_batch_size)
@@ -275,6 +275,14 @@ def __train_aspectex_bert(data_dir, init_checkpoint, learning_rate, train_sents_
         is_training=True,
         drop_remainder=True)
     estimator.train(input_fn=train_input_fn, max_steps=num_train_steps)
+
+    eval_input_fn = file_based_input_fn_builder(
+        input_file=eval_file,
+        seq_length=max_seq_len,
+        is_training=False,
+        drop_remainder=False)
+    result = estimator.evaluate(input_fn=eval_input_fn, steps=None)
+    tf.logging.info('loss={}, acc={}'.format(result['eval_loss'], result['eval_accuracy']))
 
 
 if __name__ == '__main__':
@@ -318,5 +326,6 @@ if __name__ == '__main__':
     #     se14_restaurant_valid_tfrecord_file)
     # __gen_test_tf_records(se14_restaurant_test_sents_file, se14_reataurant_test_tok_texts_file,
     #                       se14_restaurant_test_tfrecord_file)
-    __train_aspectex_bert(os.path.join(se14_dir, 'bert-data'), restaurant_init_checkpoint, learning_rate,
+    __train_aspectex_bert(se14_restaurant_train_tfrecord_file, se14_restaurant_test_tfrecord_file,
+                          restaurant_init_checkpoint, learning_rate,
                           se14_restaurant_train_sents_file)
