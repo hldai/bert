@@ -69,6 +69,33 @@ def __get_word_idx_sequence(words_list, vocab):
 #     return labels_list
 
 
+def load_sents(sents_file):
+    import json
+    sents = list()
+    with open(sents_file, encoding='utf-8') as f:
+        for line in f:
+            sents.append(json.loads(line))
+    return sents
+
+
+def get_true_terms(sents):
+    aspect_terms_true_list = list()
+    opinion_terms_true_list = list()
+    for sent in sents:
+        if aspect_terms_true_list is not None:
+            aspect_terms_true_list.append(
+                [t['term'].lower() for t in sent['terms']] if 'terms' in sent else list())
+        if opinion_terms_true_list is not None:
+            opinion_terms_true_list.append([w.lower() for w in sent.get('opinions', list())])
+    return aspect_terms_true_list, opinion_terms_true_list
+
+
+def load_train_valid_split_labels(train_valid_split_file):
+    with open(train_valid_split_file) as f:
+        vals = f.read().strip().split(' ')
+    return [int(v) for v in vals]
+
+
 def convert_single_example(ex_index, sent, tok_sent_text, max_seq_length, tokenizer):
     import tensorflow as tf
     import tokenization
