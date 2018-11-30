@@ -1,5 +1,6 @@
 import tensorflow as tf
 import os
+import config
 import json
 import collections
 import tokenization
@@ -29,7 +30,7 @@ def __gen_tf_records(tokenizer, sents, tok_texts, output_file):
     writer.close()
 
 
-def __gen_test_tf_records(sents_file, tok_texts_file, output_file):
+def __gen_test_tf_records(sents_file, tok_texts_file, output_file, vocab_file):
     tokenizer = tokenization.SpaceTokenizer(vocab_file)
     with open(sents_file, encoding='utf-8') as f:
         sents = [json.loads(line) for line in f]
@@ -39,7 +40,7 @@ def __gen_test_tf_records(sents_file, tok_texts_file, output_file):
 
 
 def __gen_train_valid_tf_records(sents_file, tok_texts_file, train_valid_split_file,
-                                 train_output_file, valid_output_file):
+                                 train_output_file, valid_output_file, vocab_file):
     tokenizer = tokenization.SpaceTokenizer(vocab_file)
     with open(sents_file, encoding='utf-8') as f:
         sents = [json.loads(line) for line in f]
@@ -321,12 +322,12 @@ def __prf1_for_terms(preds, token_seqs, aspect_terms_true_list, opinion_terms_tr
 
 
 def __run_aspectex_bert(
-        train_file, init_checkpoint, learning_rate, train_valid_split_file, valid_file=None, eval_file=None,
-        train_sents_file=None, train_tok_texts_file=None, test_sents_file=None, test_tok_texts_file=None,
-        vocab_file=None):
+        train_file, init_checkpoint, learning_rate, train_valid_split_file, output_dir,
+        valid_file=None, eval_file=None, train_sents_file=None, train_tok_texts_file=None, test_sents_file=None,
+        test_tok_texts_file=None, vocab_file=None):
     tf.logging.info(train_file)
 
-    bert_config = modeling.BertConfig.from_json_file(bert_config_file)
+    bert_config = modeling.BertConfig.from_json_file(config.BERT_CONFIG_FILE)
     tpu_cluster_resolver = None
 
     is_per_host = tf.contrib.tpu.InputPipelineConfig.PER_HOST_V2
@@ -421,17 +422,9 @@ def __run_aspectex_bert(
 
 if __name__ == '__main__':
     tf.logging.set_verbosity(tf.logging.INFO)
-    os_env = 'Windows' if platform().startswith('Windows') else 'Linux'
 
-    if os_env == 'Windows':
-        BERT_BASE_DIR = 'd:/data/res/bert'
-        se14_dir = 'd:/data/aspect/semeval14'
-        se15_dir = 'd:/data/aspect/semeval15'
-    else:
-        BERT_BASE_DIR = '/home/hldai/data/bert'
-        se14_dir = '/home/hldai/data/aspect/semeval14'
-        se15_dir = '/home/hldai/data/aspect/semeval15'
-
+    # dataset = 'se14r'
+    dataset = 'se15r'
     iterations_per_loop = 1000
     eval_batch_size, predict_batch_size = 8, 8
     warmup_proportion = 0.1
@@ -442,31 +435,26 @@ if __name__ == '__main__':
     max_seq_len = 128
     n_labels = 5
     learning_rate = 5e-5
-    output_dir = os.path.join(se14_dir, 'bert-output')
-    bert_config_file = os.path.join(BERT_BASE_DIR, 'uncased_L-12_H-768_A-12/bert_config.json')
-    vocab_file = os.path.join(BERT_BASE_DIR, 'uncased_L-12_H-768_A-12/vocab.txt')
-    restaurant_init_checkpoint = os.path.join(BERT_BASE_DIR, 'yelp/model.ckpt-10000')
-    se14_restaurant_train_sents_file = os.path.join(se14_dir, 'restaurants/restaurants_train_sents.json')
-    se14_restaurant_train_tok_texts_file = os.path.join(se14_dir, 'restaurants/restaurants_train_texts_tok.txt')
-    se14_restaurant_train_valid_split_file = os.path.join(se14_dir, 'restaurants/restaurants_train_valid_split.txt')
-    se14_restaurant_train_tfrecord_file = os.path.join(se14_dir, 'bert-data/se14-restaurants-train.tfrecord')
-    se14_restaurant_valid_tfrecord_file = os.path.join(se14_dir, 'bert-data/se14-restaurants-valid.tfrecord')
-    se14_restaurant_test_sents_file = os.path.join(se14_dir, 'restaurants/restaurants_test_sents.json')
-    se14_reataurant_test_tok_texts_file = os.path.join(se14_dir, 'restaurants/restaurants_test_texts_tok.txt')
-    se14_restaurant_test_tfrecord_file = os.path.join(se14_dir, 'bert-data/se14-restaurants-test.tfrecord')
-    se14r_init_checkpoint_for_test = os.path.join(se14_dir, 'bert-output/model.ckpt-950')
+    if dataset == 'se14r':
+        init_checkpoint_for_test = os.path.join(config.SE14_DIR, 'restaurants/bert-output/model.ckpt-2800')
+    elif dataset == 'se15r':
+        init_checkpoint_for_test = os.path.join(config.SE15_DIR, 'restaurants/bert-output/model.ckpt-2800')
+    else:
+        init_checkpoint_for_test = os.path.join(config.SE14_DIR, 'laptops/bert-output/model.ckpt-2800')
+
+    dataset_files = config.DATASET_FILES[dataset]
 
     # __gen_train_valid_tf_records(
-    #     se14_restaurant_train_sents_file, se14_restaurant_train_tok_texts_file,
-    #     se14_restaurant_train_valid_split_file, se14_restaurant_train_tfrecord_file,
-    #     se14_restaurant_valid_tfrecord_file)
-    # __gen_test_tf_records(se14_restaurant_test_sents_file, se14_reataurant_test_tok_texts_file,
-    #                       se14_restaurant_test_tfrecord_file)
-    __run_aspectex_bert(se14_restaurant_train_tfrecord_file, restaurant_init_checkpoint, learning_rate,
-                        se14_restaurant_train_valid_split_file)
+    #     dataset_files['train_sents_file'], dataset_files['train_tok_texts_file'],
+    #     dataset_files['train_valid_split_file'], dataset_files['train_tfrecord_file'],
+    #     dataset_files['valid_tfrecord_file'], config.BERT_VOCAB_FILE)
+    # __gen_test_tf_records(dataset_files['test_sents_file'], dataset_files['test_tok_texts_file'],
+    #                       dataset_files['test_tfrecord_file'], config.BERT_VOCAB_FILE)
+    __run_aspectex_bert(dataset_files['train_tfrecord_file'], init_checkpoint_for_test, learning_rate,
+                        dataset_files['train_valid_split_file'], dataset_files['bert_output_dir'])
     # __run_aspectex_bert(
-    #     se14_restaurant_train_tfrecord_file, se14r_init_checkpoint_for_test, learning_rate,
-    #     se14_restaurant_train_valid_split_file, se14_restaurant_valid_tfrecord_file,
-    #     se14_restaurant_test_tfrecord_file, se14_restaurant_train_sents_file, se14_restaurant_train_tok_texts_file,
-    #     se14_restaurant_test_sents_file,
-    #     se14_reataurant_test_tok_texts_file, vocab_file)
+    #     dataset_files['train_tfrecord_file'], init_checkpoint_for_test, learning_rate,
+    #     dataset_files['train_valid_split_file'], dataset_files['bert_output_dir'],
+    #     dataset_files['valid_tfrecord_file'], dataset_files['test_tfrecord_file'],
+    #     dataset_files['train_sents_file'], dataset_files['train_tok_texts_file'],
+    #     dataset_files['test_sents_file'], dataset_files['test_tok_texts_file'], config.BERT_VOCAB_FILE)
