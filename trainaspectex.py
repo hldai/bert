@@ -438,7 +438,7 @@ if __name__ == '__main__':
     num_tpu_cores = 1
     save_checkpoints_steps = 200
     train_batch_size = 32
-    num_train_epochs = 10.0
+    num_train_epochs = 50.0
     max_seq_len = 128
     n_labels = 5
     learning_rate = 5e-5
@@ -462,12 +462,11 @@ if __name__ == '__main__':
     #     se14_restaurant_valid_tfrecord_file)
     # __gen_test_tf_records(se14_restaurant_test_sents_file, se14_reataurant_test_tok_texts_file,
     #                       se14_restaurant_test_tfrecord_file)
-    # __run_aspectex_bert(se14_restaurant_train_tfrecord_file, se14_restaurant_test_tfrecord_file,
-    #                     restaurant_init_checkpoint, learning_rate,
-    #                     se14_restaurant_train_sents_file)
-    __run_aspectex_bert(
-        se14_restaurant_train_tfrecord_file, se14r_init_checkpoint_for_test, learning_rate,
-        se14_restaurant_train_valid_split_file, se14_restaurant_valid_tfrecord_file,
-        se14_restaurant_test_tfrecord_file, se14_restaurant_train_sents_file, se14_restaurant_train_tok_texts_file,
-        se14_restaurant_test_sents_file,
-        se14_reataurant_test_tok_texts_file, vocab_file)
+    __run_aspectex_bert(se14_restaurant_train_tfrecord_file, restaurant_init_checkpoint, learning_rate,
+                        se14_restaurant_train_valid_split_file)
+    # __run_aspectex_bert(
+    #     se14_restaurant_train_tfrecord_file, se14r_init_checkpoint_for_test, learning_rate,
+    #     se14_restaurant_train_valid_split_file, se14_restaurant_valid_tfrecord_file,
+    #     se14_restaurant_test_tfrecord_file, se14_restaurant_train_sents_file, se14_restaurant_train_tok_texts_file,
+    #     se14_restaurant_test_sents_file,
+    #     se14_reataurant_test_tok_texts_file, vocab_file)
