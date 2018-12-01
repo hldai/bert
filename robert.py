@@ -118,7 +118,7 @@ def __evaluate(dataset_valid, sess, predict, input_ids, input_mask, segment_ids,
     (a_p_v, a_r_v, a_f1_v, o_p_v, o_r_v, o_f1_v
      ) = datautils.prf1_for_terms(all_preds, token_seqs, at_true_list, ot_true_list)
     f1_sum = a_f1_v + o_f1_v
-    print(
+    tf.logging.info(
         'Valid, p={:.4f}, r={:.4f}, a_f1={:.4f}; p={:.4f}, r={:.4f}, o_f1={:.4f}, f1_sum={:.4f}'.format(
             a_p_v, a_r_v, a_f1_v, o_p_v, o_r_v, o_f1_v, f1_sum))
     return f1_sum
@@ -187,7 +187,8 @@ def __train_robert(
         losses.append(loss_val)
 
         if (step + 1) % n_train_steps_per_epoch == 0:
-            print(step + 1, sum(losses) / len(losses))
+            epoch = int((step + 1) / n_train_steps_per_epoch)
+            tf.logging.info('{} {} {}'.format(epoch, step + 1, sum(losses) / len(losses)))
             losses = list()
             f1_sum_valid = __evaluate(
                 dataset_valid, sess, predict, input_ids, input_mask, segment_ids, label_ids, hidden_dropout,
