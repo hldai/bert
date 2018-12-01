@@ -112,10 +112,6 @@ def __evaluate(dataset_valid, sess, predict, input_ids, input_mask, segment_ids,
                 segment_ids: features["segment_ids"], label_ids: features["label_ids"],
                 hidden_dropout: 1.0, attention_probs_dropout: 1.0
             })
-            if idx == 7:
-                print(features['input_ids'])
-                print(token_seqs[:eval_batch_size])
-                print()
             idx += 1
             for y_pred in predict_vals:
                 all_preds.append(y_pred)
