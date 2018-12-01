@@ -209,7 +209,7 @@ def file_based_input_fn_builder(input_file, seq_length, is_training,
             d = d.shuffle(buffer_size=100)
 
         d = d.apply(
-            tf.contrib.data.map_and_batch(
+            tf.data.experimental.map_and_batch(
                 lambda record: _decode_record(record, name_to_features),
                 batch_size=batch_size,
                 drop_remainder=drop_remainder))
@@ -234,91 +234,6 @@ def __get_num_train_valid_samples(train_valid_split_file):
         if v == 0:
             n_train_samples += 1
     return n_train_samples, len(vals) - n_train_samples
-
-
-def __get_sent_tokens(tok_texts_file, vocab_file):
-    # print(vocab_file)
-    tokenizer = tokenization.SpaceTokenizer(vocab_file)
-    f = open(tok_texts_file, encoding='utf-8')
-    token_seqs = list()
-    for line in f:
-        raw_tokens = tokenizer.tokenize(line)
-        tokens = ["[CLS]"]
-        for token in raw_tokens:
-            tokens.append(token)
-        tokens.append("[SEP]")
-        token_seqs.append(tokens)
-    return token_seqs
-
-
-def get_terms_from_label_list(labels, words, label_beg, label_in):
-    terms = list()
-    # words = tok_text.split(' ')
-    # print(labels_pred)
-    # print(len(words), len(labels_pred))
-    assert len(words) == len(labels)
-
-    p = 0
-    while p < len(words):
-        yi = labels[p]
-        if yi == label_beg:
-            pright = p
-            while pright + 1 < len(words) and labels[pright + 1] == label_in:
-                pright += 1
-            terms.append(' '.join(words[p: pright + 1]))
-            p = pright + 1
-        else:
-            p += 1
-    return terms
-
-
-def count_hit(terms_true, terms_pred):
-    terms_true, terms_pred = terms_true.copy(), terms_pred.copy()
-    terms_true.sort()
-    terms_pred.sort()
-    idx_pred = 0
-    cnt_hit = 0
-    for t in terms_true:
-        while idx_pred < len(terms_pred) and terms_pred[idx_pred] < t:
-            idx_pred += 1
-        if idx_pred == len(terms_pred):
-            continue
-        if terms_pred[idx_pred] == t:
-            cnt_hit += 1
-            idx_pred += 1
-    return cnt_hit
-
-
-def __prf1_for_terms(preds, token_seqs, aspect_terms_true_list, opinion_terms_true_list):
-    aspect_true_cnt, aspect_sys_cnt, aspect_hit_cnt = 0, 0, 0
-    opinion_true_cnt, opinion_sys_cnt, opinion_hit_cnt = 0, 0, 0
-    for i, (p_seq, token_seq) in enumerate(zip(preds, token_seqs)):
-        seq_len = len(token_seq)
-        aspect_terms_sys = get_terms_from_label_list(p_seq[1:seq_len - 1], token_seq[1:seq_len - 1], 1, 2)
-        opinion_terms_sys = get_terms_from_label_list(p_seq[1:seq_len - 1], token_seq[1:seq_len - 1], 3, 4)
-        aspect_terms_true, opinion_terms_true = aspect_terms_true_list[i], opinion_terms_true_list[i]
-        aspect_sys_cnt += len(aspect_terms_sys)
-        aspect_true_cnt += len(aspect_terms_true)
-        opinion_sys_cnt += len(opinion_terms_sys)
-        opinion_true_cnt += len(opinion_terms_true)
-
-        new_hit_cnt = count_hit(aspect_terms_true, aspect_terms_sys)
-        aspect_hit_cnt += new_hit_cnt
-        new_hit_cnt = count_hit(opinion_terms_true, opinion_terms_sys)
-        opinion_hit_cnt += new_hit_cnt
-
-    def prf1(n_true, n_sys, n_hit):
-        p = n_hit / (n_sys + 1e-6)
-        r = n_hit / (n_true + 1e-6)
-        f1 = 2 * p * r / (p + r + 1e-6)
-        return p, r, f1
-
-    aspect_p, aspect_r, aspect_f1 = prf1(aspect_true_cnt, aspect_sys_cnt, aspect_hit_cnt)
-    opinion_p, opinion_r, opinion_f1 = prf1(opinion_true_cnt, opinion_sys_cnt, opinion_hit_cnt)
-    # tf.logging.info('p={:.4f}, r={:.4f}, a_f1={:.4f}; p={:.4f}, r={:.4f}, o_f1={:.4f}'.format(
-    #                 aspect_p, aspect_r, aspect_f1, opinion_p, opinion_r,
-    #                 opinion_f1))
-    return aspect_p, aspect_r, aspect_f1, opinion_p, opinion_r, opinion_f1
 
 
 def __run_aspectex_bert(
@@ -386,7 +301,7 @@ def __run_aspectex_bert(
         preds = estimator.predict(valid_input_fn)
         preds = [y for y in preds]
         train_valid_split_labels = datautils.load_train_valid_split_labels(train_valid_split_file)
-        token_seqs = __get_sent_tokens(train_tok_texts_file, vocab_file)
+        token_seqs = datautils.get_sent_tokens(train_tok_texts_file, vocab_file)
         valid_token_seqs = [token_seq for token_seq, tmpl in zip(token_seqs, train_valid_split_labels) if tmpl == 1]
         assert len(preds) == len(valid_token_seqs)
         all_train_sents = datautils.load_sents(train_sents_file)
@@ -394,7 +309,7 @@ def __run_aspectex_bert(
         assert len(preds) == len(valid_sents)
         aspect_terms_true_list, opinion_terms_true_list = datautils.get_true_terms(valid_sents)
         (a_p_v, a_r_v, a_f1_v, o_p_v, o_r_v, o_f1_v
-         ) = __prf1_for_terms(preds, valid_token_seqs, aspect_terms_true_list, opinion_terms_true_list)
+         ) = datautils.prf1_for_terms(preds, valid_token_seqs, aspect_terms_true_list, opinion_terms_true_list)
 
         eval_input_fn = file_based_input_fn_builder(
             input_file=eval_file,
@@ -406,11 +321,11 @@ def __run_aspectex_bert(
         # tf.logging.info('loss={}, acc={}'.format(result['eval_loss'], result['eval_accuracy']))
 
         preds = estimator.predict(eval_input_fn)
-        token_seqs = __get_sent_tokens(test_tok_texts_file, vocab_file)
+        token_seqs = datautils.get_sent_tokens(test_tok_texts_file, vocab_file)
         test_sents = datautils.load_sents(test_sents_file)
         aspect_terms_true_list, opinion_terms_true_list = datautils.get_true_terms(test_sents)
         (a_p_t, a_r_t, a_f1_t, o_p_t, o_r_t, o_f1_t
-         ) = __prf1_for_terms(preds, token_seqs, aspect_terms_true_list, opinion_terms_true_list)
+         ) = datautils.prf1_for_terms(preds, token_seqs, aspect_terms_true_list, opinion_terms_true_list)
         tf.logging.info(init_checkpoint)
         f1_sum_valid = a_f1_v + o_f1_v
         tf.logging.info(
@@ -438,7 +353,7 @@ if __name__ == '__main__':
     if dataset == 'se14r':
         init_checkpoint_for_test = os.path.join(config.SE14_DIR, 'restaurants/bert-output/model.ckpt-2800')
     elif dataset == 'se15r':
-        init_checkpoint_for_test = os.path.join(config.SE15_DIR, 'restaurants/bert-output/model.ckpt-2800')
+        init_checkpoint_for_test = os.path.join(config.SE15_DIR, 'restaurants/bert-output/model.ckpt-800')
     else:
         init_checkpoint_for_test = os.path.join(config.SE14_DIR, 'laptops/bert-output/model.ckpt-2800')
 
@@ -450,11 +365,11 @@ if __name__ == '__main__':
     #     dataset_files['valid_tfrecord_file'], config.BERT_VOCAB_FILE)
     # __gen_test_tf_records(dataset_files['test_sents_file'], dataset_files['test_tok_texts_file'],
     #                       dataset_files['test_tfrecord_file'], config.BERT_VOCAB_FILE)
-    __run_aspectex_bert(dataset_files['train_tfrecord_file'], init_checkpoint_for_test, learning_rate,
-                        dataset_files['train_valid_split_file'], dataset_files['bert_output_dir'])
-    # __run_aspectex_bert(
-    #     dataset_files['train_tfrecord_file'], init_checkpoint_for_test, learning_rate,
-    #     dataset_files['train_valid_split_file'], dataset_files['bert_output_dir'],
-    #     dataset_files['valid_tfrecord_file'], dataset_files['test_tfrecord_file'],
-    #     dataset_files['train_sents_file'], dataset_files['train_tok_texts_file'],
-    #     dataset_files['test_sents_file'], dataset_files['test_tok_texts_file'], config.BERT_VOCAB_FILE)
+    # __run_aspectex_bert(dataset_files['train_tfrecord_file'], dataset_files['init_checkpoint'], learning_rate,
+    #                     dataset_files['train_valid_split_file'], dataset_files['bert_output_dir'])
+    __run_aspectex_bert(
+        dataset_files['train_tfrecord_file'], init_checkpoint_for_test, learning_rate,
+        dataset_files['train_valid_split_file'], dataset_files['bert_output_dir'],
+        dataset_files['valid_tfrecord_file'], dataset_files['test_tfrecord_file'],
+        dataset_files['train_sents_file'], dataset_files['train_tok_texts_file'],
+        dataset_files['test_sents_file'], dataset_files['test_tok_texts_file'], config.BERT_VOCAB_FILE)

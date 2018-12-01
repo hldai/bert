@@ -1,6 +1,7 @@
 from platform import platform
 from os.path import join
 
+NUM_LABELS = 5
 
 os_env = 'Windows' if platform().startswith('Windows') else 'Linux'
 
