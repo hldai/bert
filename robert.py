@@ -203,9 +203,10 @@ def __train_robert(
                 a_p_t, a_r_t, a_f1_t, o_p_t, o_r_t, o_f1_t = __evaluate(
                     dataset_test, sess, predict, input_ids, input_mask, segment_ids, label_ids, hidden_dropout,
                     attention_probs_dropout, test_token_seqs, test_at_true_list, test_ot_true_list)
+                f1_sum_t = a_f1_t + o_f1_t
                 logging.info(
                     'Test, p={:.4f}, r={:.4f}, a_f1={:.4f}; p={:.4f}, r={:.4f}, o_f1={:.4f}, f1_sum={:.4f}'.format(
-                        a_p_t, a_r_t, a_f1_t, o_p_t, o_r_t, o_f1_t, f1_sum))
+                        a_p_t, a_r_t, a_f1_t, o_p_t, o_r_t, o_f1_t, f1_sum_t))
 
 
 if __name__ == '__main__':
