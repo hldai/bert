@@ -1,13 +1,13 @@
 import tensorflow as tf
 import os
 import config
-import json
-import collections
 import tokenization
+import datetime
 import datautils
 import dhlmodeling
 import optimization
-from platform import platform
+from loggingutils import init_logging
+import logging
 
 
 def __get_dataset(data_file, batch_size, is_train, seq_length):
@@ -119,11 +119,7 @@ def __evaluate(dataset_valid, sess, predict, input_ids, input_mask, segment_ids,
             break
     (a_p_v, a_r_v, a_f1_v, o_p_v, o_r_v, o_f1_v
      ) = datautils.prf1_for_terms(all_preds, token_seqs, at_true_list, ot_true_list)
-    f1_sum = a_f1_v + o_f1_v
-    tf.logging.info(
-        'Valid, p={:.4f}, r={:.4f}, a_f1={:.4f}; p={:.4f}, r={:.4f}, o_f1={:.4f}, f1_sum={:.4f}'.format(
-            a_p_v, a_r_v, a_f1_v, o_p_v, o_r_v, o_f1_v, f1_sum))
-    return f1_sum
+    return a_p_v, a_r_v, a_f1_v, o_p_v, o_r_v, o_f1_v
 
 
 def __train_robert(
@@ -175,6 +171,7 @@ def __train_robert(
     sess = tf.Session()
     sess.run(tf.global_variables_initializer())
     losses = list()
+    best_f1_sum = 0
     for step in range(num_train_steps):
         features = sess.run(next_train_example)
         # input_ids = features["input_ids"]
@@ -192,16 +189,29 @@ def __train_robert(
             epoch = int((step + 1) / n_train_steps_per_epoch)
             tf.logging.info('{} {} {}'.format(epoch, step + 1, sum(losses) / len(losses)))
             losses = list()
-            f1_sum_valid = __evaluate(
+
+            a_p_v, a_r_v, a_f1_v, o_p_v, o_r_v, o_f1_v = __evaluate(
                 dataset_valid, sess, predict, input_ids, input_mask, segment_ids, label_ids, hidden_dropout,
                 attention_probs_dropout, valid_token_seqs, valid_at_true_list, valid_ot_true_list)
-            f1_sum_valid = __evaluate(
-                dataset_test, sess, predict, input_ids, input_mask, segment_ids, label_ids, hidden_dropout,
-                attention_probs_dropout, test_token_seqs, test_at_true_list, test_ot_true_list)
+            f1_sum = a_f1_v + o_f1_v
+            logging.info(
+                'Valid, p={:.4f}, r={:.4f}, a_f1={:.4f}; p={:.4f}, r={:.4f}, o_f1={:.4f}, f1_sum={:.4f}'.format(
+                    a_p_v, a_r_v, a_f1_v, o_p_v, o_r_v, o_f1_v, f1_sum))
+
+            if f1_sum > best_f1_sum:
+                best_f1_sum = f1_sum
+                a_p_t, a_r_t, a_f1_t, o_p_t, o_r_t, o_f1_t = __evaluate(
+                    dataset_test, sess, predict, input_ids, input_mask, segment_ids, label_ids, hidden_dropout,
+                    attention_probs_dropout, test_token_seqs, test_at_true_list, test_ot_true_list)
+                logging.info(
+                    'Test, p={:.4f}, r={:.4f}, a_f1={:.4f}; p={:.4f}, r={:.4f}, o_f1={:.4f}, f1_sum={:.4f}'.format(
+                        a_p_t, a_r_t, a_f1_t, o_p_t, o_r_t, o_f1_t, f1_sum))
 
 
 if __name__ == '__main__':
-    tf.logging.set_verbosity(tf.logging.INFO)
+    # tf.logging.set_verbosity(tf.logging.INFO)
+    str_today = datetime.date.today().strftime('%y-%m-%d')
+    init_logging('log/robert-{}.log'.format(str_today), mode='a', to_stdout=True)
 
     # dataset = 'se14r'
     dataset = 'se15r'
