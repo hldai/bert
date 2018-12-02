@@ -359,14 +359,6 @@ if __name__ == '__main__':
 
     dataset_files = config.DATASET_FILES[dataset]
 
-    # __gen_train_valid_tf_records(
-    #     dataset_files['train_sents_file'], dataset_files['train_tok_texts_file'],
-    #     dataset_files['train_valid_split_file'], dataset_files['train_tfrecord_file'],
-    #     dataset_files['valid_tfrecord_file'], config.BERT_VOCAB_FILE)
-    # __gen_test_tf_records(dataset_files['test_sents_file'], dataset_files['test_tok_texts_file'],
-    #                       dataset_files['test_tfrecord_file'], config.BERT_VOCAB_FILE)
-    # __run_aspectex_bert(dataset_files['train_tfrecord_file'], dataset_files['init_checkpoint'], learning_rate,
-    #                     dataset_files['train_valid_split_file'], dataset_files['bert_output_dir'])
     __run_aspectex_bert(
         dataset_files['train_tfrecord_file'], init_checkpoint_for_test, learning_rate,
         dataset_files['train_valid_split_file'], dataset_files['bert_output_dir'],

@@ -2,16 +2,19 @@ from platform import platform
 from os.path import join
 
 NUM_LABELS = 5
+MAX_SEQ_LEN = 128
 
 os_env = 'Windows' if platform().startswith('Windows') else 'Linux'
 
 
 if os_env == 'Windows':
     BERT_BASE_DIR = 'd:/data/res/bert'
+    RES_DIR = 'd:/data/res/'
     SE14_DIR = 'd:/data/aspect/semeval14'
     SE15_DIR = 'd:/data/aspect/semeval15'
 else:
     BERT_BASE_DIR = '/home/hldai/data/bert'
+    RES_DIR = '/home/hldai/data/res/'
     SE14_DIR = '/home/hldai/data/aspect/semeval14'
     SE15_DIR = '/home/hldai/data/aspect/semeval15'
 
@@ -28,7 +31,7 @@ SE14R_FILES = {
     'train_tfrecord_file': join(SE14_DIR, 'bert-data/se14-restaurants-train.tfrecord'),
     'valid_tfrecord_file': join(SE14_DIR, 'bert-data/se14-restaurants-valid.tfrecord'),
     'test_tfrecord_file': join(SE14_DIR, 'bert-data/se14-restaurants-test.tfrecord'),
-    'init_checkpoint': join(BERT_BASE_DIR, 'yelp/model.ckpt-10000')
+    'init_checkpoint': join(BERT_BASE_DIR, 'yelp/model.ckpt-10000'),
 }
 
 SE15R_FILES = {
@@ -41,7 +44,20 @@ SE15R_FILES = {
     'train_tfrecord_file': join(SE15_DIR, 'bert-data/se15r-train.tfrecord'),
     'valid_tfrecord_file': join(SE15_DIR, 'bert-data/se15r-valid.tfrecord'),
     'test_tfrecord_file': join(SE15_DIR, 'bert-data/se15r-test.tfrecord'),
-    'init_checkpoint': join(BERT_BASE_DIR, 'yelp/model.ckpt-10000')
+    'bert_train_tokens_file': join(SE15_DIR, 'bert-data/se15r-train-tokens.txt'),
+    'bert_valid_tokens_file': join(SE15_DIR, 'bert-data/se15r-valid-tokens.txt'),
+    'bert_test_tokens_file': join(SE15_DIR, 'bert-data/se15r-test-tokens.txt'),
+    'init_checkpoint': join(BERT_BASE_DIR, 'yelp/model.ckpt-10000'),
+    'pretrain_aspect_terms_file': join(SE15_DIR, 'restaurants/yelpr9-rest-part0_04-aspect-rule-result.txt'),
+    'pretrain_opinion_terms_file': join(SE15_DIR, 'restaurants/yelpr9-rest-part0_04-opinion-rule-result.txt'),
+    'pretrain_train_aspect_tfrec_file': join(SE15_DIR, 'restaurants/yelpr9-rest-part0_04-train-aspect.tfrecord'),
+    'pretrain_valid_aspect_tfrec_file': join(SE15_DIR, 'restaurants/yelpr9-rest-part0_04-valid-aspect.tfrecord'),
+    'pretrain_train_aspect_token_file': join(SE15_DIR, 'restaurants/yelpr9-rest-part0_04-train-aspect-tokens.txt'),
+    'pretrain_valid_aspect_token_file': join(SE15_DIR, 'restaurants/yelpr9-rest-part0_04-valid-aspect-tokens.txt'),
+    'pretrain_train_opinion_tfrec_file': join(SE15_DIR, 'restaurants/yelpr9-rest-part0_04-train-opinion.tfrecord'),
+    'pretrain_valid_opinion_tfrec_file': join(SE15_DIR, 'restaurants/yelpr9-rest-part0_04-valid-opinion.tfrecord'),
+    'pretrain_train_opinion_token_file': join(SE15_DIR, 'restaurants/yelpr9-rest-part0_04-train-opinion-tokens.txt'),
+    'pretrain_valid_opinion_token_file': join(SE15_DIR, 'restaurants/yelpr9-rest-part0_04-valid-opinion-tokens.txt'),
 }
 
 DATASET_FILES = {

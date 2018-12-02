@@ -17,6 +17,12 @@ def get_sent_tokens(tok_texts_file, vocab_file):
     return token_seqs
 
 
+def read_lines(filename):
+    with open(filename, encoding='utf-8') as f:
+        lines = [line.strip() for line in f]
+    return lines
+
+
 def count_hit(terms_true, terms_pred):
     terms_true, terms_pred = terms_true.copy(), terms_pred.copy()
     terms_true.sort()
@@ -182,14 +188,23 @@ def load_train_valid_split_labels(train_valid_split_file):
     return [int(v) for v in vals]
 
 
-def convert_single_example(ex_index, sent, tok_sent_text, max_seq_length, tokenizer):
+def load_train_valid_idxs(train_valid_idxs_file):
+    with open(train_valid_idxs_file, encoding='utf-8') as f:
+        train_idxs = next(f).strip().split(' ')
+        train_idxs = [int(idx) for idx in train_idxs]
+        valid_idxs = next(f).strip().split(' ')
+        valid_idxs = [int(idx) for idx in valid_idxs]
+    return train_idxs, valid_idxs
+
+
+def convert_single_example_single_term_type(ex_index, tok_sent_text, terms, max_seq_length, tokenizer):
     import tensorflow as tf
 
-    sent_tokens = tokenizer.tokenize(tok_sent_text)
+    tokens = tokenizer.tokenize(tok_sent_text)
 
     # Account for [CLS] and [SEP] with "- 2"
-    if len(sent_tokens) > max_seq_length - 2:
-        sent_tokens = sent_tokens[0:(max_seq_length - 2)]
+    if len(tokens) > max_seq_length - 2:
+        tokens = tokens[0:(max_seq_length - 2)]
 
     # The convention in BERT is:
     # (a) For sequence pairs:
@@ -210,21 +225,90 @@ def convert_single_example(ex_index, sent, tok_sent_text, max_seq_length, tokeni
     # used as as the "sentence vector". Note that this only makes sense because
     # the entire model is fine-tuned.
 
-    tokens = []
-    segment_ids = []
-    tokens.append("[CLS]")
-    segment_ids.append(0)
-    for token in sent_tokens:
-        tokens.append(token)
-        segment_ids.append(0)
-    tokens.append("[SEP]")
-    segment_ids.append(0)
+    tokens.insert(0, '[CLS]')
+    tokens.append('[SEP]')
+    segment_ids = [0] * len(tokens)
 
     input_ids = tokenizer.convert_tokens_to_ids(tokens)
 
-    aspect_objs = sent.get('terms', None)
-    aspect_terms = [t['term'] for t in aspect_objs] if aspect_objs is not None else list()
-    opinion_terms = sent.get('opinions', list())
+    # aspect_objs = sent.get('terms', None)
+    # aspect_terms = [t['term'] for t in aspect_objs] if aspect_objs is not None else list()
+    # opinion_terms = sent.get('opinions', list())
+    label_seq = label_sentence(tokens, terms)
+    label_seq = list(label_seq)
+
+    # The mask has 1 for real tokens and 0 for padding tokens. Only real
+    # tokens are attended to.
+    input_mask = [1] * len(input_ids)
+
+    # Zero-pad up to the sequence length.
+    while len(input_ids) < max_seq_length:
+        input_ids.append(0)
+        input_mask.append(0)
+        segment_ids.append(0)
+        label_seq.append(0)
+
+    assert len(input_ids) == max_seq_length
+    assert len(input_mask) == max_seq_length
+    assert len(segment_ids) == max_seq_length
+    assert len(label_seq) == max_seq_length
+
+    # label_id = label_map[example.label]
+    if ex_index < 5:
+        tf.logging.info("*** Example ***")
+        # tf.logging.info("guid: %s" % (example.guid))
+        tf.logging.info("tokens: %s" % " ".join(
+            [tokenization.printable_text(x) for x in tokens]))
+        tf.logging.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
+        tf.logging.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
+        tf.logging.info("segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
+        # tf.logging.info("label: %s (id = %d)" % (example.label, label_id))
+
+    # feature = InputFeatures(
+    #     input_ids=input_ids,
+    #     input_mask=input_mask,
+    #     segment_ids=segment_ids,
+    #     label_id=label_id)
+    return input_ids, input_mask, segment_ids, label_seq, tokens
+
+
+def convert_single_example(ex_index, tok_sent_text, aspect_terms, opinion_terms, max_seq_length, tokenizer):
+    import tensorflow as tf
+
+    tokens = tokenizer.tokenize(tok_sent_text)
+
+    # Account for [CLS] and [SEP] with "- 2"
+    if len(tokens) > max_seq_length - 2:
+        tokens = tokens[0:(max_seq_length - 2)]
+
+    # The convention in BERT is:
+    # (a) For sequence pairs:
+    #  tokens:   [CLS] is this jack ##son ##ville ? [SEP] no it is not . [SEP]
+    #  type_ids: 0     0  0    0    0     0       0 0     1  1  1  1   1 1
+    # (b) For single sequences:
+    #  tokens:   [CLS] the dog is hairy . [SEP]
+    #  type_ids: 0     0   0   0  0     0 0
+    #
+    # Where "type_ids" are used to indicate whether this is the first
+    # sequence or the second sequence. The embedding vectors for `type=0` and
+    # `type=1` were learned during pre-training and are added to the wordpiece
+    # embedding vector (and position vector). This is not *strictly* necessary
+    # since the [SEP] token unambiguously separates the sequences, but it makes
+    # it easier for the model to learn the concept of sequences.
+    #
+    # For classification tasks, the first vector (corresponding to [CLS]) is
+    # used as as the "sentence vector". Note that this only makes sense because
+    # the entire model is fine-tuned.
+
+    tokens.insert(0, '[CLS]')
+    tokens.append('[SEP]')
+    segment_ids = [0] * len(tokens)
+
+    input_ids = tokenizer.convert_tokens_to_ids(tokens)
+
+    # aspect_objs = sent.get('terms', None)
+    # aspect_terms = [t['term'] for t in aspect_objs] if aspect_objs is not None else list()
+    # opinion_terms = sent.get('opinions', list())
     label_seq = label_sentence(tokens, aspect_terms, opinion_terms)
     label_seq = list(label_seq)
 
@@ -260,4 +344,4 @@ def convert_single_example(ex_index, sent, tok_sent_text, max_seq_length, tokeni
     #     input_mask=input_mask,
     #     segment_ids=segment_ids,
     #     label_id=label_id)
-    return input_ids, input_mask, segment_ids, label_seq
+    return input_ids, input_mask, segment_ids, label_seq, tokens
