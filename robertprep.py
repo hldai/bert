@@ -147,7 +147,8 @@ def gen_pretrain_tfrecords(
 
 
 if __name__ == '__main__':
-    dataset = 'se14r'
+    dataset = 'se14l'
+    # dataset = 'se14r'
     # dataset = 'se15r'
     yelp_pretrain_tok_texts_file = os.path.join(
         config.RES_DIR, 'yelp/eng-part/yelp-rest-sents-r9-tok-eng-part0_04.txt')
@@ -171,13 +172,13 @@ if __name__ == '__main__':
     #     config.BERT_VOCAB_FILE,
     #     dataset_files['test_sents_file'], dataset_files['test_tok_texts_file'],
     #     dataset_files['test_tfrecord_file'], dataset_files['bert_test_tokens_file'])
-    gen_pretrain_tfrecords(
-        vocab_file=config.BERT_VOCAB_FILE, tok_texts_file=pretrain_tok_texts_file,
-        aspect_terms_file=dataset_files['pretrain_aspect_terms_file'],
-        opinion_terms_file=dataset_files['pretrain_opinion_terms_file'], train_valid_idxs_file=tv_idxs_file,
-        train_aspect_output_file=dataset_files['pretrain_train_aspect_tfrec_file'],
-        train_opinion_output_file=dataset_files['pretrain_train_opinion_tfrec_file'],
-        valid_aspect_output_file=dataset_files['pretrain_valid_aspect_tfrec_file'],
-        valid_opinion_output_file=dataset_files['pretrain_valid_opinion_tfrec_file'],
-        valid_token_output_file=dataset_files['pretrain_valid_token_file']
-    )
+    # gen_pretrain_tfrecords(
+    #     vocab_file=config.BERT_VOCAB_FILE, tok_texts_file=pretrain_tok_texts_file,
+    #     aspect_terms_file=dataset_files['pretrain_aspect_terms_file'],
+    #     opinion_terms_file=dataset_files['pretrain_opinion_terms_file'], train_valid_idxs_file=tv_idxs_file,
+    #     train_aspect_output_file=dataset_files['pretrain_train_aspect_tfrec_file'],
+    #     train_opinion_output_file=dataset_files['pretrain_train_opinion_tfrec_file'],
+    #     valid_aspect_output_file=dataset_files['pretrain_valid_aspect_tfrec_file'],
+    #     valid_opinion_output_file=dataset_files['pretrain_valid_opinion_tfrec_file'],
+    #     valid_token_output_file=dataset_files['pretrain_valid_token_file']
+    # )

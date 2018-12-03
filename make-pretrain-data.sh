@@ -2,8 +2,8 @@ BERT_BASE_DIR="/home/hldai/data/bert/uncased_L-12_H-768_A-12"
 DST_DIR="/home/hldai/data/bert"
 
 python create_pretraining_data.py \
-  --input_file=/home/hldai/data/yelp/yelp-review-eng-tok-sents-round-9.txt \
-  --output_file=$DST_DIR/yelp-bert.tfrecord \
+  --input_file=/home/hldai/data/res/amazon/laptops-reivews-sent-tok-text.txt \
+  --output_file=$DST_DIR/amazon-bert.tfrecord \
   --vocab_file=$BERT_BASE_DIR/vocab.txt \
   --do_lower_case=True \
   --max_seq_length=128 \
