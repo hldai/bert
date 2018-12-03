@@ -301,7 +301,7 @@ def __run_aspectex_bert(
         preds = estimator.predict(valid_input_fn)
         preds = [y for y in preds]
         train_valid_split_labels = datautils.load_train_valid_split_labels(train_valid_split_file)
-        token_seqs = datautils.get_sent_tokens(train_tok_texts_file, vocab_file)
+        token_seqs = datautils.get_sent_token_seqs(train_tok_texts_file, vocab_file)
         valid_token_seqs = [token_seq for token_seq, tmpl in zip(token_seqs, train_valid_split_labels) if tmpl == 1]
         assert len(preds) == len(valid_token_seqs)
         all_train_sents = datautils.load_sents(train_sents_file)
@@ -321,7 +321,7 @@ def __run_aspectex_bert(
         # tf.logging.info('loss={}, acc={}'.format(result['eval_loss'], result['eval_accuracy']))
 
         preds = estimator.predict(eval_input_fn)
-        token_seqs = datautils.get_sent_tokens(test_tok_texts_file, vocab_file)
+        token_seqs = datautils.get_sent_token_seqs(test_tok_texts_file, vocab_file)
         test_sents = datautils.load_sents(test_sents_file)
         aspect_terms_true_list, opinion_terms_true_list = datautils.get_true_terms(test_sents)
         (a_p_t, a_r_t, a_f1_t, o_p_t, o_r_t, o_f1_t

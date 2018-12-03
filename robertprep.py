@@ -86,53 +86,77 @@ def gen_train_valid_tf_records(
 
 
 def gen_pretrain_tfrecords(
-        vocab_file, tok_texts_file, terms_file, train_valid_idxs_file,
-        train_output_file, valid_output_file, valid_token_output_file):
+        vocab_file, tok_texts_file, aspect_terms_file, opinion_terms_file, train_valid_idxs_file,
+        train_aspect_output_file, train_opinion_output_file, valid_aspect_output_file, valid_opinion_output_file,
+        valid_token_output_file):
     tokenizer = tokenization.SpaceTokenizer(vocab_file)
-    terms_list = __load_json_objs(terms_file)
+    aspect_terms_list = __load_json_objs(aspect_terms_file)
+    opinion_terms_list = __load_json_objs(opinion_terms_file)
     tok_texts = datautils.read_lines(tok_texts_file)
 
     idxs_train, idxs_valid = datautils.load_train_valid_idxs(train_valid_idxs_file)
     assert len(tok_texts) == len(idxs_train) + len(idxs_valid)
-    assert len(tok_texts) == len(terms_list)
+    assert len(tok_texts) == len(aspect_terms_list)
+    assert len(tok_texts) == len(opinion_terms_list)
 
-    def write_records(example_idxs, output_file, token_output_file):
-        writer = tf.python_io.TFRecordWriter(output_file)
+    def write_records(example_idxs, aspect_output_file, opinion_output_file, token_output_file):
+        writer_a = tf.python_io.TFRecordWriter(aspect_output_file)
+        writer_o = tf.python_io.TFRecordWriter(opinion_output_file)
         fout = open(token_output_file, 'w', encoding='utf-8') if token_output_file else None
         for i, idx in enumerate(example_idxs):
             if (i + 1) % 10000 == 0:
                 print(i + 1, len(example_idxs))
                 # break
-            (input_ids, input_mask, segment_ids, label_seq, tokens
-             ) = datautils.convert_single_example_single_term_type(
-                i, tok_texts[idx], terms_list[idx], config.MAX_SEQ_LEN, tokenizer)
+
+            tokens = datautils.get_sent_tokens(tok_texts[idx], tokenizer, config.MAX_SEQ_LEN)
+            tmp_input_ids = tokenizer.convert_tokens_to_ids(tokens)
+            tmp_aspect_label_seq = list(datautils.label_sentence(tokens, aspect_terms_list[idx]))
+
+            (input_ids, input_mask, segment_ids, aspect_label_seq, tokens
+             ) = datautils.example_to_feats(tokens, tmp_aspect_label_seq, tmp_input_ids, config.MAX_SEQ_LEN)
+
+            features = __get_feature_dict(input_ids, input_mask, segment_ids, aspect_label_seq, len(tokens))
+            tf_example = tf.train.Example(features=tf.train.Features(feature=features))
+            writer_a.write(tf_example.SerializeToString())
+
+            tmp_opinion_label_seq = list(datautils.label_sentence(tokens, opinion_terms_list[idx]))
+
+            (input_ids, input_mask, segment_ids, opinion_label_seq, tokens
+             ) = datautils.example_to_feats(tokens, tmp_opinion_label_seq, tmp_input_ids, config.MAX_SEQ_LEN)
+
+            features = __get_feature_dict(input_ids, input_mask, segment_ids, opinion_label_seq, len(tokens))
+            tf_example = tf.train.Example(features=tf.train.Features(feature=features))
+            writer_o.write(tf_example.SerializeToString())
+
+            # (input_ids, input_mask, segment_ids, label_seq, tokens
+            #  ) = datautils.convert_single_example_single_term_type(
+            #     i, tok_texts[idx], terms_list[idx], config.MAX_SEQ_LEN, tokenizer)
             # print(input_ids)
             # print(label_seq)
             # print(tokens)
             # exit()
-            features = __get_feature_dict(input_ids, input_mask, segment_ids, label_seq, len(tokens))
-            tf_example = tf.train.Example(features=tf.train.Features(feature=features))
-            writer.write(tf_example.SerializeToString())
             if fout is not None:
                 fout.write('{}\n'.format(' '.join(tokens)))
-        writer.close()
+        writer_a.close()
+        writer_o.close()
         if fout is not None:
             fout.close()
 
-    write_records(idxs_train, train_output_file, None)
-    write_records(idxs_valid, valid_output_file, valid_token_output_file)
+    write_records(idxs_train, train_aspect_output_file, train_opinion_output_file, None)
+    write_records(idxs_valid, valid_aspect_output_file, valid_opinion_output_file, valid_token_output_file)
 
 
 if __name__ == '__main__':
-    # dataset = 'se14r'
-    dataset = 'se15r'
-    dataset_files = config.DATASET_FILES[dataset]
+    dataset = 'se14r'
+    # dataset = 'se15r'
     yelp_pretrain_tok_texts_file = os.path.join(
         config.RES_DIR, 'yelp/eng-part/yelp-rest-sents-r9-tok-eng-part0_04.txt')
     yelp_tv_idxs_file = os.path.join(config.RES_DIR, 'yelp/eng-part/yelp-rest-sents-r9-tok-eng-part0_04-tvidxs.txt')
     amazon_pretrain_tok_texts_file = os.path.join(
         config.RES_DIR, 'amazon/laptops-reivews-sent-tok-text.txt')
     amazon_tv_idxs_file = os.path.join(config.RES_DIR, 'amazon/laptops-reivews-sent-tok-text-tvidxs.txt')
+
+    dataset_files = config.DATASET_FILES[dataset]
     pretrain_tok_texts_file = amazon_pretrain_tok_texts_file if dataset == 'se14l' else yelp_pretrain_tok_texts_file
     tv_idxs_file = amazon_tv_idxs_file if dataset == 'se14l' else yelp_tv_idxs_file
 
@@ -149,15 +173,11 @@ if __name__ == '__main__':
     #     dataset_files['test_tfrecord_file'], dataset_files['bert_test_tokens_file'])
     gen_pretrain_tfrecords(
         vocab_file=config.BERT_VOCAB_FILE, tok_texts_file=pretrain_tok_texts_file,
-        terms_file=dataset_files['pretrain_aspect_terms_file'], train_valid_idxs_file=tv_idxs_file,
-        train_output_file=dataset_files['pretrain_train_aspect_tfrec_file'],
-        valid_output_file=dataset_files['pretrain_valid_aspect_tfrec_file'],
-        valid_token_output_file=dataset_files['pretrain_valid_aspect_token_file']
+        aspect_terms_file=dataset_files['pretrain_aspect_terms_file'],
+        opinion_terms_file=dataset_files['pretrain_opinion_terms_file'], train_valid_idxs_file=tv_idxs_file,
+        train_aspect_output_file=dataset_files['pretrain_train_aspect_tfrec_file'],
+        train_opinion_output_file=dataset_files['pretrain_train_opinion_tfrec_file'],
+        valid_aspect_output_file=dataset_files['pretrain_valid_aspect_tfrec_file'],
+        valid_opinion_output_file=dataset_files['pretrain_valid_opinion_tfrec_file'],
+        valid_token_output_file=dataset_files['pretrain_valid_token_file']
     )
-    # gen_pretrain_tfrecords(
-    #     vocab_file=config.BERT_VOCAB_FILE, tok_texts_file=pretrain_tok_texts_file,
-    #     terms_file=dataset_files['pretrain_opinion_terms_file'], train_valid_idxs_file=tv_idxs_file,
-    #     train_output_file=dataset_files['pretrain_train_opinion_tfrec_file'],
-    #     valid_output_file=dataset_files['pretrain_valid_opinion_tfrec_file'],
-    #     valid_token_output_file=dataset_files['pretrain_valid_opinion_token_file']
-    # )

@@ -2,7 +2,7 @@ import numpy as np
 import tokenization
 
 
-def get_sent_tokens(tok_texts_file, vocab_file):
+def get_sent_token_seqs(tok_texts_file, vocab_file):
     # print(vocab_file)
     tokenizer = tokenization.SpaceTokenizer(vocab_file)
     f = open(tok_texts_file, encoding='utf-8')
@@ -197,36 +197,43 @@ def load_train_valid_idxs(train_valid_idxs_file):
     return train_idxs, valid_idxs
 
 
+def get_sent_tokens(tok_sent_text, tokenizer, max_seq_length):
+    tokens = tokenizer.tokenize(tok_sent_text)
+    if len(tokens) > max_seq_length - 2:
+        tokens = tokens[0:(max_seq_length - 2)]
+    tokens.insert(0, '[CLS]')
+    tokens.append('[SEP]')
+    return tokens
+
+
+def example_to_feats(tokens, label_seq, input_ids, max_seq_length):
+    input_ids = input_ids.copy()
+    label_seq = label_seq.copy()
+    segment_ids = [0] * len(tokens)
+
+    # The mask has 1 for real tokens and 0 for padding tokens. Only real
+    # tokens are attended to.
+    input_mask = [1] * len(input_ids)
+
+    # Zero-pad up to the sequence length.
+    while len(input_ids) < max_seq_length:
+        input_ids.append(0)
+        input_mask.append(0)
+        segment_ids.append(0)
+        label_seq.append(0)
+
+    assert len(input_ids) == max_seq_length
+    assert len(input_mask) == max_seq_length
+    assert len(segment_ids) == max_seq_length
+    assert len(label_seq) == max_seq_length
+
+    return input_ids, input_mask, segment_ids, label_seq, tokens
+
+
 def convert_single_example_single_term_type(ex_index, tok_sent_text, terms, max_seq_length, tokenizer):
     import tensorflow as tf
 
-    tokens = tokenizer.tokenize(tok_sent_text)
-
-    # Account for [CLS] and [SEP] with "- 2"
-    if len(tokens) > max_seq_length - 2:
-        tokens = tokens[0:(max_seq_length - 2)]
-
-    # The convention in BERT is:
-    # (a) For sequence pairs:
-    #  tokens:   [CLS] is this jack ##son ##ville ? [SEP] no it is not . [SEP]
-    #  type_ids: 0     0  0    0    0     0       0 0     1  1  1  1   1 1
-    # (b) For single sequences:
-    #  tokens:   [CLS] the dog is hairy . [SEP]
-    #  type_ids: 0     0   0   0  0     0 0
-    #
-    # Where "type_ids" are used to indicate whether this is the first
-    # sequence or the second sequence. The embedding vectors for `type=0` and
-    # `type=1` were learned during pre-training and are added to the wordpiece
-    # embedding vector (and position vector). This is not *strictly* necessary
-    # since the [SEP] token unambiguously separates the sequences, but it makes
-    # it easier for the model to learn the concept of sequences.
-    #
-    # For classification tasks, the first vector (corresponding to [CLS]) is
-    # used as as the "sentence vector". Note that this only makes sense because
-    # the entire model is fine-tuned.
-
-    tokens.insert(0, '[CLS]')
-    tokens.append('[SEP]')
+    tokens = get_sent_tokens(tok_sent_text, tokenizer, max_seq_length)
     segment_ids = [0] * len(tokens)
 
     input_ids = tokenizer.convert_tokens_to_ids(tokens)

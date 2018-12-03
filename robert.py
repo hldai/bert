@@ -138,11 +138,11 @@ def __train_robert(
     dataset_valid = __get_dataset(valid_data_file, batch_size, False, seq_length)
     dataset_test = __get_dataset(test_data_file, batch_size, False, seq_length)
 
-    token_seqs = datautils.get_sent_tokens(train_tok_texts_file, vocab_file)
+    token_seqs = datautils.get_sent_token_seqs(train_tok_texts_file, vocab_file)
     valid_token_seqs = [token_seq for token_seq, tmpl in zip(token_seqs, train_valid_split_labels) if tmpl == 1]
     valid_at_true_list, valid_ot_true_list = datautils.get_true_terms(valid_sents)
 
-    test_token_seqs = datautils.get_sent_tokens(test_tok_texts_file, vocab_file)
+    test_token_seqs = datautils.get_sent_token_seqs(test_tok_texts_file, vocab_file)
     test_sents = datautils.load_sents(test_sents_file)
     test_at_true_list, test_ot_true_list = datautils.get_true_terms(test_sents)
 
