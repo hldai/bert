@@ -214,6 +214,7 @@ if __name__ == '__main__':
     str_today = datetime.date.today().strftime('%y-%m-%d')
     init_logging('log/robert-{}.log'.format(str_today), mode='a', to_stdout=True)
 
+    # dataset = 'se14l'
     # dataset = 'se14r'
     dataset = 'se15r'
     iterations_per_loop = 1000
@@ -229,7 +230,7 @@ if __name__ == '__main__':
     dataset_files = config.DATASET_FILES[dataset]
     seq_length = 128
     batch_size = 5
-    n_epochs = 50
+    n_epochs = 100
 
     __train_robert(
         config.BERT_VOCAB_FILE, dataset_files['train_sents_file'], dataset_files['train_tok_texts_file'],
